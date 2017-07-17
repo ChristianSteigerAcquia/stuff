@@ -1,0 +1,85 @@
+diff --git a/drush/acsf_tools.drush.inc b/drush/acsf_tools.drush.inc
+index eb118d0..89f0ecb 100644
+--- a/drush/acsf_tools.drush.inc
++++ b/drush/acsf_tools.drush.inc
+@@ -23,6 +23,14 @@ function acsf_tools_drush_command() {
+     ),
+   );
+ 
++  $items['acsf-tools-pd'] = array(
++    'description' => dt('List all preferred domains of the factory.'),
++    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_SITE,
++    'examples' => array(
++      'drush acsf-tools-pd' => 'Get a list of preferred domains.',
++    ),
++  );
++
+   $items['acsf-tools-ml'] = array(
+     'description' => dt('Runs the passed drush command against all the sites of the factory (ml stands for multiple -l option).'),
+     'allow-additional-options' => TRUE,
+@@ -79,6 +87,19 @@ function drush_acsf_tools_list() {
+ }
+ 
+ /**
++ * Action callback for acsf-tools-pd command.
++ * List sites with their preferred domains
++ */
++function drush_acsf_tools_pd() {
++  // Look for list of sites and print it.
++  if ($sites = _drush_acsf_tools_get_sites_pd()) {
++    foreach ($sites as $name => $details) {
++      drush_print($details['domain']);
++    }
++  }
++}
++
++/**
+  * Validate callback for acsf-tools-ml command.
+  */
+ function drush_acsf_tools_ml_validate() {
+@@ -189,6 +210,32 @@ function _drush_acsf_tools_get_sites() {
+ }
+ 
+ /**
++ * Utility function to retrieve the preferred domains of all sites
++ */
++function _drush_acsf_tools_get_sites_pd() {
++  $sites = FALSE;
++
++  // Look for list of sites and loop over it.
++  if (($map = gardens_site_data_load_file()) && isset($map['sites'])) {
++    // Acquire sites info.
++    $sites = array();
++    foreach ($map['sites'] as $domain => $site_details) {
++      if(!isset($sites[$site_details['name']]['prefered_domain']) ){
++        $sites[$site_details['name']]['domain'] = $domain;
++      }
++      if(isset($site_details['flag']['prefered_domain']) &&  $site_details['flag']['prefered_domain'] == TRUE){
++        $sites[$site_details['name']]['prefered_domain'] = TRUE;
++      }    
++    }
++  }
++  else {
++    drush_log("\nFailed to retrieve the list of sites of the factory.", 'error');
++  }
++
++  return $sites;
++}
++
++/**
+  * Utility function to print arrays.
+  */
+ function _drush_acsf_tools_recursive_print($variable, $indent) {
+diff --git a/scripts/cloud-hooks/functions.sh b/scripts/cloud-hooks/functions.sh
+index 319f07c..1471b9a 100644
+--- a/scripts/cloud-hooks/functions.sh
++++ b/scripts/cloud-hooks/functions.sh
+@@ -29,7 +29,7 @@
+   # Generate an array of all site URIs on the Factory from parsed output of Drush utility.
+   while IFS=$'\n' read -r line; do
+       sites[i++]="$line"
+-      done < <(drush @"${drush_alias}" --include=./drush acsf-tools-list | grep domains: -A 1 | grep 0: | sed -e 's/^[0: ]*//')
++      done < <(drush @"${drush_alias}" --include=./drush acsf-tools-pd)
+       unset IFS
+ 
+   # Loop through each available site uri and run BLT deploy updates.
